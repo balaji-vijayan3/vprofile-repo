@@ -1,35 +1,45 @@
 pipeline {
     agent any
+    tools {
+	maven 'Maven3'
+	}
+    environment {
+        APP_NAME = "vprofile-vprem"
+        RELEASE = "1.0.0"
+        DOCKER_USER = "balajivijayan10"
+        DOCKER_PASSWORD = 'dockerhub'
+        IMAGE_NAME = "${DOCKER_USER}" + "/" + "${APP_NAME}"
+        TAG = "${RELEASE}-${BUILD_NUMBER}"
+    }
 
-    stages{
-        stage('fetch code') {
-          steps{
-              git branch: 'vp-rem', url: "https://github.com/devopshydclub/vprofile-repo.git"
-          }  
-        }
-
-        stage('Build') {
+    stages {
+        stage('checkout') {
             steps {
-                sh 'mvn clean install -DskipTests'
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/balaji-vijayan3/vprofile-repo.git']])
             }
-            post {
-                success {
-                    echo "Now Archiving."
-                    archiveArtifacts artifacts: '**/*.war'
+        }
+        stage('Build Application') {
+            steps {
+                sh "mvn clean package"
+            }
+        }
+        stage('Test Application') {
+            steps {
+                sh "mvn test"
+            }
+        }
+        stage('Build & Push') {
+            steps {
+                script {
+                docker.withRegistry('', DOCKER_PASSWORD) {
+                docker_image = docker.build "${IMAGE_NAME}"
+                    }
+                    docker.withRegistry('', DOCKER_PASSWORD) {
+                    docker_image.push("${TAG}")
+                    }
                 }
             }
         }
-        stage('Test'){
-            steps {
-                sh 'mvn test'
-            }
-
-        }
-         stage('Code Ananlysis'){
-            steps {
-                sh 'mvn checkstyle:checkstyle'
-            }
-
-        }
-    }
+        
+    }   
 }
